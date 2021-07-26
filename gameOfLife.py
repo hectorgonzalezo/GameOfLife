@@ -11,7 +11,7 @@ ON = 255
 OFF = 0
 vals = [ON, OFF]
 
-ALIVE_INITIAL_PROB = 0.15
+ALIVE_INITIAL_PROB = float(input('Write a initial probability for alive squares (default= 0.15):')) 
 GRID_SIZE = 50
 
 client = udp_client.SimpleUDPClient("127.0.0.1", 57120)
