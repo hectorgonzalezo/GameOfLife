@@ -12,10 +12,10 @@ OFF = 0
 vals = [ON, OFF]
 
 ALIVE_INITIAL_PROB = float(input('Write a initial probability for alive squares (default= 0.15):')) 
-GRID_SIZE = 50
+GRID_SIZE = 50 
 
 client = udp_client.SimpleUDPClient("127.0.0.1", 57120)
-#client.send_message("/game", 10)
+client.send_message("/gridSize", GRID_SIZE)
 
 
 def randomGrid(N):
