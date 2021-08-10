@@ -11,8 +11,10 @@ ON = 255
 OFF = 0
 vals = [ON, OFF]
 
-ALIVE_INITIAL_PROB = float(input('Write a initial probability for alive squares (default= 0.15):')) 
+#ALIVE_INITIAL_PROB = float(input('Write a initial probability for alive squares (default= 0.15):')) 
+ALIVE_INITIAL_PROB = 0.15
 GRID_SIZE = 50 
+WAIT_TIME = 0.5
 
 client = udp_client.SimpleUDPClient("127.0.0.1", 57120)
 client.send_message("/gridSize", GRID_SIZE)
@@ -64,7 +66,7 @@ def addGosperGliderGun(i, j, grid):
     grid[i:i+11, j:j+38] = gun
 
 def update(frameNum, img, grid, N):
-    sleep(0.1)
+    sleep(WAIT_TIME)
 
     # copy grid since we require 8 neighbors
     # for calculation and we go line by line

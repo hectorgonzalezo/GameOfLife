@@ -1,30 +1,36 @@
 
 (
 
-~lowestFreq = 200;
-//receives grid size from python
-OSCdef(\gridReceiver, {
-	|msg, time, addr, recvPort|
-	~gridSize = msg[1];
+~lowestFreq = 70;
 
-}, '/gridSize'); // def style
+~count = 0;
 
 
+//function that groups al x coordiantes of a single y
+~clumpsXbyYindex = {
+	|coordinates|
+	var initialNum, xOrdered, checkerArray;
 
+	initialNum = 0;
+	xOrdered = List.new;
+	checkerArray = List.new;
+	coordinates.do({
+		|coord|
 
-// set them from outside later:
-SynthDef(\bells, { |out, lowFreq = 200|
-    var freqs, ringtimes, signal, amplitudes, density;
-	freqs = Control.names([\freqs]).kr(Array.rand(~gridSize, 100, 400));
-	ringtimes = Control.names([\ringtimes]).kr(1!~gridSize);
-	amplitudes = Control.names([\amplitudes]).kr(Array.rand(~gridSize, 0.1, 1)/~gridSize);
-	density = Control.names([\density]).kr(1);
-	signal = DynKlank.ar(`[freqs.lag2(0.05), amplitudes.lag2(0.05), ringtimes ], SoundIn.ar*density);
-	Out.ar(out, Splay.ar(RHPF.ar(signal, lowFreq*2)));
-}).add;
+		if(coord[0] == initialNum,
+			{checkerArray.add(coord[1])},
+			{
+			xOrdered.add(checkerArray);
+			checkerArray = List.new;
+			initialNum = initialNum +1;
+			}
+		);
 
+	});
+	xOrdered;
 
-a = Synth(\bells);
+};
+
 
 
 
@@ -41,25 +47,88 @@ Tdef(\migrate,{
 	~lowestFreq = ~newLowestFreq ;
 });
 
-~count = 280;
+
+
+
+//receives grid size from python
+OSCdef(\gridReceiver, {
+
+	|msg, time, addr, recvPort|
+
+	~gridSize = msg[1];
+
+	~initialrray = 0!~gridSize;
+
+	//add synthdef
+	SynthDef(\bells, {
+		|out, lowFreq = 200, pan=0|
+    var freqs, ringtimes, signal, amplitudes, density;
+
+	freqs = Control.names([\freqs]).kr(Array.fill(~gridSize, {|i| i.linexp(0, ~gridSize, ~lowestFreq, 5000)}));
+	ringtimes = Control.names([\ringtimes]).kr(1!~gridSize);
+	amplitudes = Control.names([\amplitudes]).kr(0!~gridSize);
+	density = Control.names([\density]).kr(1);
+	signal = DynKlank.ar(`[freqs, amplitudes, ringtimes ], SoundIn.ar*density);
+	Out.ar(0, Splay.ar(HPF.ar(signal, ~lowestFreq*4),0, center:pan));
+}).add;
+
+
+	//play a Synth for each side on the grid
+	~bells = { |i| Synth(\bells, [\pan, i.linlin(0, ~gridSize, -1, 1)])}!~gridSize;
+
+
+
+}, '/gridSize');
+
+
+
 
 //receives osc from python and turns it into coordinates
 OSCdef(\drum, {|msg, time, addr, recvPort|
-	~coordinates = msg.copyRange(1,msg.size).clump(2);
-	~xCoord = msg.copySeries(1,3, msg.size);
-	~yCoord = msg.copySeries(2,4, msg.size);
+
+	var coordinates, xCoord, yCoord, xOrdered;
+
+	coordinates = msg.copyRange(1,msg.size).clump(2);
+	xCoord = msg.copySeries(1,3, msg.size);
+	yCoord = msg.copySeries(2,4, msg.size);
+
+
+
+	xOrdered = ~clumpsXbyYindex.value(coordinates);
+
+	//xOrdered.postln;
+
 	//msg.postln;
 	~count.postln;
 
-	a.setn(\density, ~coordinates.size.linlin(2, ~gridSize**2, 1.5, 0.8));
+	xOrdered.do({
+		|yCoords, i|
 
-	a.setn(\freqs, ~xCoord.linexp(0, ~gridSize, ~lowestFreq, 10000));
-	a.setn(\amplitudes, ~yCoord.linlin(0, ~gridSize, 0.2, 1)/~coordinates.size);
-	a.setn(\ringtimes, ~yCoord.lincurve(0, ~gridSize, 5.0, 0.5, -4));
+		var ampsArray;
+
+		ampsArray = 0!~gridSize;
+
+		yCoords.do({ |yCoord| ampsArray.put(yCoord, 1)});
+
+
+		//~bells[i].setn(\freqs, yCoords.linexp(0, ~gridSize, ~lowestFreq, 5000));
+		~bells[i].setn(\amplitudes, ampsArray);
+		~bells[i].setn(\ringtimes, i.lincurve(0, ~gridSize, 5.0, 0.5, -4));
+
+
+		if(~count ==0, {
+		~bells[i].setn(\density, coordinates.size.linlin(2, ~gridSize**2, 0.1, 0.05));
+		});
+		ampsArray.postln;
+		});
+
+
+
 
 	~count = ~count + 1;
 
-	if(~count%rran(200, 500) == 0 ,{
+	//migrate from one harmonic area to another every rrand(200, 500) instances
+	if(~count%(rrand(200, 500)) == 0 ,{
 		~newLowestFreq = exprand(100, 400);
 
 		Tdef(\migrate).play;
